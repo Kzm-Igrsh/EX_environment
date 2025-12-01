@@ -1,80 +1,98 @@
 #include <M5Unified.h>
 
-// ==========================================
-// AtomS3 Lite ピン設定
-// ==========================================
+// 4つのモーターピン
 const int MOTOR1_PIN = 5;  // G5
 const int MOTOR2_PIN = 6;  // G6
 const int MOTOR3_PIN = 7;  // G7
 const int MOTOR4_PIN = 8;  // G8
 
-// ==========================================
-// PWM設定
-// ==========================================
-const int PWM_FREQ = 1000;   // 1kHz
-const int PWM_RES  = 8;      // 8bit (0-255)
+// PWMチャンネル設定
+const int MOTOR1_CH = 0;
+const int MOTOR2_CH = 1;
+const int MOTOR3_CH = 2;
+const int MOTOR4_CH = 3;
 
-// チャンネル割り当て
-const int CH1 = 0;
-const int CH2 = 1;
-const int CH3 = 2;
-const int CH4 = 3;
+// PWM設定（参考コードと同じ）
+const int PWM_FREQ = 191;   // 200Hz
+const int PWM_RES = 8;      // 8bit (0-255)
 
-// 状態管理
+// 出力強度設定（参考コードと同じ）
+const int POWER_STOP = 0;
+const int POWER_WEAK = 80;     // 弱い
+const int POWER_STRONG = 191;  // 強い
+
 bool isRunning = false;
 
-// ==========================================
-// 4モーター同時制御
-// ==========================================
-void setAllMotors(int speed) {
-  speed = constrain(speed, 0, 255);
-  
-  ledcWrite(CH1, speed);
-  ledcWrite(CH2, speed);
-  ledcWrite(CH3, speed);
-  ledcWrite(CH4, speed);
+// 全モーター同時制御関数（4つ対応）
+void setAllMotors(int power) {
+  // 範囲制限
+  if (power < 0) power = 0;
+  if (power > 255) power = 255;
 
-  Serial.printf("4 Motors: %d/255\n", speed);
+  ledcWrite(MOTOR1_CH, power);
+  ledcWrite(MOTOR2_CH, power);
+  ledcWrite(MOTOR3_CH, power);
+  ledcWrite(MOTOR4_CH, power);
+  
+  Serial.printf("All Motors Set to: %d\n", power);
 }
 
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+  
+  // LEDを青にする（起動中）
+  M5.Display.fillScreen(BLUE);
+  
   Serial.begin(115200);
-  delay(500);
+  delay(1000);
+  
+  Serial.println("\n4 DC Motor Control (AtomS3 Lite)");
+  Serial.println("==================================");
 
-  Serial.println("=== 4x N20 Motor @ 6000RPM ===");
-  Serial.println("Press Button: Start/Stop");
-
-  // PWM初期化（4チャンネル同時）
-  ledcSetup(CH1, PWM_FREQ, PWM_RES);
-  ledcSetup(CH2, PWM_FREQ, PWM_RES);
-  ledcSetup(CH3, PWM_FREQ, PWM_RES);
-  ledcSetup(CH4, PWM_FREQ, PWM_RES);
-
-  // ピン割り当て
-  ledcAttachPin(MOTOR1_PIN, CH1);
-  ledcAttachPin(MOTOR2_PIN, CH2);
-  ledcAttachPin(MOTOR3_PIN, CH3);
-  ledcAttachPin(MOTOR4_PIN, CH4);
-
-  // 停止状態で開始
-  setAllMotors(0);
+  // 4つのモーターのPWM初期化
+  Serial.printf("Init Motor1: Pin=%d, Ch=%d\n", MOTOR1_PIN, MOTOR1_CH);
+  ledcSetup(MOTOR1_CH, PWM_FREQ, PWM_RES);
+  ledcAttachPin(MOTOR1_PIN, MOTOR1_CH);
+  ledcWrite(MOTOR1_CH, 0);
+  
+  Serial.printf("Init Motor2: Pin=%d, Ch=%d\n", MOTOR2_PIN, MOTOR2_CH);
+  ledcSetup(MOTOR2_CH, PWM_FREQ, PWM_RES);
+  ledcAttachPin(MOTOR2_PIN, MOTOR2_CH);
+  ledcWrite(MOTOR2_CH, 0);
+  
+  Serial.printf("Init Motor3: Pin=%d, Ch=%d\n", MOTOR3_PIN, MOTOR3_CH);
+  ledcSetup(MOTOR3_CH, PWM_FREQ, PWM_RES);
+  ledcAttachPin(MOTOR3_PIN, MOTOR3_CH);
+  ledcWrite(MOTOR3_CH, 0);
+  
+  Serial.printf("Init Motor4: Pin=%d, Ch=%d\n", MOTOR4_PIN, MOTOR4_CH);
+  ledcSetup(MOTOR4_CH, PWM_FREQ, PWM_RES);
+  ledcAttachPin(MOTOR4_PIN, MOTOR4_CH);
+  ledcWrite(MOTOR4_CH, 0);
+  
+  Serial.println("PWM Init Complete");
+  Serial.println("\nPress button to Start/Stop (All motors simultaneously)\n");
+  
+  // 準備完了したら赤（停止中）にする
+  M5.Display.fillScreen(RED);
 }
 
 void loop() {
   M5.update();
   
-  // ボタン押下でON/OFF
-  if (M5.BtnA.wasPressed()) {
+  // ボタン押下：4つ同時にON/OFF切り替え
+  if (M5.BtnA.wasPressed() || M5.BtnPWR.wasPressed()) {
     isRunning = !isRunning;
     
     if (isRunning) {
-      Serial.println("START");
-      setAllMotors(255); // 最大出力（6000rpm想定）
+      Serial.println(">>> START (All 4 Motors) <<<");
+      M5.Display.fillScreen(GREEN); // 緑：動作中
+      setAllMotors(POWER_STRONG);   // 全モーターSTRONG(200)で回転
     } else {
-      Serial.println("STOP");
-      setAllMotors(0);
+      Serial.println(">>> STOP <<<");
+      M5.Display.fillScreen(RED);   // 赤：停止
+      setAllMotors(POWER_STOP);     // 停止
     }
   }
   
